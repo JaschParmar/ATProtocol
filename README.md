@@ -1,6 +1,6 @@
 # Bluesky Bot Detector
 
-This repository contains a complete end-to-end pipeline for detecting bot accounts on the Bluesky social network, inspired by academic research on Twitter bot detection.
+This repository contains a complete end-to-end pipeline for detecting bot accounts on the Bluesky social network, inspired by academic research on Twitter bot detection. The project implements **ensemble learning** using multiple machine learning models with majority voting for robust bot detection.
 
 ## 📌 Overview
 
@@ -9,10 +9,11 @@ The aim of this project is to adapt Twitter-based bot detection strategies to th
 - Data collection from Bluesky via the ATProtocol
 - Manual labeling of an initial training set
 - Feature engineering from user metadata and post behavior
-- Model training using Random Forest with evaluation
+- **Multi-model ensemble training** (Random Forest, Logistic Regression, KNN, SVM, Neural Network)
+- **Majority voting classification** for improved accuracy
 - Prediction on a larger, unlabeled dataset of ~4,200 accounts
 
----
+***
 
 ## 🧪 Dataset Creation
 
@@ -53,45 +54,42 @@ Extracted by analyzing up to 100 recent posts per user (API limit):
 
 These limitations influenced feature selection.
 
----
+***
 
-## 🤖 Model Training
+## 🤖 Ensemble Model Training
 
-The labeled dataset was used to train a **Random Forest Classifier**. Key results:
+The labeled dataset was used to train **five different machine learning models** to create a robust ensemble classifier:
 
-### 🧪 Evaluation (80/20 train-test split):
-=== Classification Report ===
+### 🔬 Individual Model Performance
 
-                precision    recall  f1-score   support
+| Model | Cross-Validation Accuracy | Test Accuracy | Precision (Bot) | Recall (Bot) |
+|-------|--------------------------|---------------|-----------------|--------------|
+| **Random Forest** | 0.87 ± 0.08 | 1.00 | 1.00 | 1.00 |
+| **Logistic Regression** | 0.88 ± 0.08 | 0.89 | 0.86 | 0.86 |
+| **K-Nearest Neighbors** | 0.87 ± 0.07 | 0.79 | 0.80 | 0.57 |
+| **Support Vector Machine** | 0.84 ± 0.09 | 0.84 | 0.83 | 0.71 |
+| **Neural Network (MLP)** | 0.65 ± 0.14 | 0.47 | 0.36 | 0.57 |
 
-      human         1.00      1.00      1.00        12
-        bot         1.00      1.00      1.00         7
+### 🗳️ Majority Voting Ensemble
 
-    accuracy                            1.00        19
-    macro avg       1.00      1.00      1.00        19
-    weighted avg    1.00      1.00      1.00        19
+The final classification uses **majority voting** across all five models:
+- If ≥3 models predict "bot" → classified as **bot**
+- If ≥3 models predict "human" → classified as **human**
 
-=== Confusion Matrix ===
-  
-  [[12  0]
-  
-   [ 0  7]]
+**Ensemble Agreement Patterns:**
+- **Unanimous decisions**: 27.5% of cases (25.2% unanimous bot, 2.3% unanimous human)
+- **Strong agreement (4-1)**: 57.2% of cases
+- **Close decisions (3-2)**: 15.3% of cases
 
-### 🔁 5-Fold Cross Validation:
-Cross-validation accuracy scores:
-[0.8947, 0.8333, 0.9444, 0.7222, 0.9444]
+### 🧠 Key Feature Insights
+Across all models, the most important features for bot detection were:
+1. `avg_likes_received` - Behavioral engagement patterns
+2. `avg_replies_received` - Social interaction metrics  
+3. `average_post_interval` - Temporal posting behavior
 
-Mean accuracy: 0.87
-Standard deviation: ±0.08
+These behavioral markers proved more significant than simple follower counts.
 
-### 🧠 Feature Importance (Top 3)
-1. `avg_likes_received`
-2. `avg_replies_received`
-3. `average_post_interval`
-
-These behavioral markers proved more significant than raw follower counts.
-
----
+***
 
 ## 🌍 Scaling Up to 4K+ Accounts
 
@@ -102,76 +100,94 @@ To create a larger, unlabeled dataset:
 - 72 were deleted/inaccessible during the process.
 - Final count: **4,249 active accounts**
 
-The trained model was then used to predict labels for each account.
+### 🎯 Final Ensemble Results
 
-### 🔚 Results:
+**Majority Voting Classification:**
+- **Human accounts**: 631 (14.9%) ✅
+- **Bot accounts**: 3,618 (85.1%) 🤖
 
-Out of 4,249 accounts:
+**Model Agreement Analysis:**
+- High confidence decisions (4+ models agree): 82.0%
+- Unanimous bot detection: 1,072 accounts (25.2%)
+- Unanimous human detection: 98 accounts (2.3%)
 
-	•	Human: 712 ✅
-	•	Bot:   3,537 🤖
+The high bot detection rate reflects the specific sampling methodology from official Bluesky followers, where automated and promotional accounts are common.
 
- While this ratio appears extreme, manual inspection of random samples confirmed the model's predictions aligned well with observable behavior.
+***
 
----
+## 📁 Repository Structure
 
-## 📁 Files in This Repo
+### 🧠 Training Scripts
 
-### 🧠 Code Files
+| File | Description |
+|------|-------------|
+| `train_model.py` | Random Forest model training and evaluation |
+| `train_model_logistic.py` | Logistic Regression with feature scaling |
+| `train_model_knn.py` | K-Nearest Neighbors with permutation importance |
+| `train_model_svm.py` | Support Vector Machine with RBF kernel |
+| `train_model_mlp.py` | Multi-layer Perceptron neural network |
 
-| File                          | Description                                                                 |
-|-------------------------------|-----------------------------------------------------------------------------|
-| `train_model.py`              | Trains a Random Forest model using the labeled dataset (`initial_dataset.json`) |
-| `predict_labels.py`           | Applies the trained model to predict bot/human labels for the 4K dataset    |
-| `initial_dataset.py`          | Script to build the initial labeled dataset (50 humans + manually found bots) |
-| `generate_50_human.py`        | Collects 50 human accounts by sampling users followed by Jay                |
-| `generate_4k_accounts.py`     | Samples 4,000+ random accounts from the official Bluesky followers list     |
-| `4k_dataset.py`               | Computes features for the 4K+ accounts and saves the full unlabeled dataset |
-| `trial.py`                    | Script for early-stage feature testing and debugging                        |
+### 🔮 Prediction Scripts
 
-### 📊 Data Files
+| File | Description |
+|------|-------------|
+| `predict_labels.py` | Random Forest predictions on 4K dataset |
+| `predict_labels_logistic.py` | Logistic Regression predictions |
+| `predict_labels_knn.py` | KNN predictions |
+| `predict_labels_svm.py` | SVM predictions |
+| `predict_labels_mlp.py` | Neural network predictions |
+| `majority_voting.py` | **Ensemble majority voting system** |
 
-| File                          | Description                                                                 |
-|-------------------------------|-----------------------------------------------------------------------------|
-| `initial_dataset.json`        | 108 manually labeled accounts (bots + humans)                              |
-| `50_human.json`               | Raw list of 50 human handles used to build initial dataset                  |
-| `4k_accounts.json`            | List of ~4321 sampled random Bluesky accounts                              |
-| `unlabeled_4k_dataset.json`   | Feature-computed dataset for 4k+ accounts (no labels yet)                  |
-| `labeled_4k_dataset.json`     | Final 4k+ dataset with model-predicted bot/human labels                    |
+### 📊 Dataset Files
 
-### 🤖 Model Files
+| File | Description |
+|------|-------------|
+| `initial_dataset.json` | 108 manually labeled accounts (training set) |
+| `unlabeled_4k_dataset.json` | 4,249 accounts with extracted features |
+| `labeled_4k_dataset_majority_voting.json` | **Final ensemble predictions** |
+| `labeled_4k_dataset_[model].json` | Individual model predictions |
 
-| File                          | Description                                                                 |
-|-------------------------------|-----------------------------------------------------------------------------|
-| `bot_detector_model.pkl`      | Model trained with 80/20 split (evaluation model)                          |
-| `bot_detector_model_final.pkl`| Final model trained on full labeled data (used for real predictions)       |
+### 🤖 Trained Models
 
-### 📈 Visuals
+| File | Description |
+|------|-------------|
+| `bot_detector_model_[model]_final.pkl` | Production-ready trained models |
+| `bot_detector_model_[model].pkl` | Evaluation models (80/20 split) |
 
-| File                          | Description                                                                 |
-|-------------------------------|-----------------------------------------------------------------------------|
-| `feature_importance.png`      | Feature importance chart from training phase                               |
-| `feature_importance_on_4k.png`| Feature importance chart after labeling the 4k dataset                     |
+### 📈 Analysis & Visualization
 
+| File | Description |
+|------|-------------|
+| `feature_importance_[model].png` | Feature importance charts for each model |
+| `majority_voting_analysis.png` | Comprehensive ensemble analysis visualization |
 
+***
 
+## 🚀 Usage
 
+1. **Train all models:**
+   ```bash
+   python train_model.py
+   python train_model_logistic.py
+   python train_model_knn.py
+   python train_model_svm.py
+   python train_model_mlp.py
+   ```
 
+2. **Generate predictions:**
+   ```bash
+   python predict_labels.py
+   python predict_labels_logistic.py
+   python predict_labels_knn.py
+   python predict_labels_svm.py
+   python predict_labels_mlp.py
+   ```
 
+3. **Create ensemble predictions:**
+   ```bash
+   python majority_voting.py
+   ```
 
+The final ensemble results will be saved in `labeled_4k_dataset_majority_voting.json`.
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+***
